@@ -1,13 +1,20 @@
 from dataclasses import dataclass, replace
 
-file = open("day12-test.txt")
-#file = open("day12-input.txt")
+# file = open("day12-test.txt")
+file = open("day12-input.txt")
 lines = file.readlines()
 map = [[c for c in line.strip()] for line in lines]
 rows = len(map)
 cols = len(map[0])
 
-def flood_fill(position: tuple[int, int], already_found: set[tuple[int, int]]) -> set[tuple[int, int]]:
+def map_safe_get(pos: tuple[int, int]):
+    if pos[0] < 0 or pos[0] >= rows or pos[1] < 0 or pos[1] >= cols:
+        return "OOB"
+    return map[pos[0]][pos[1]]
+
+def flood_fill(
+    position: tuple[int, int], already_found: set[tuple[int, int]]
+) -> set[tuple[int, int]]:
     already_found.add((position[0], position[1]))
     symbol = map[position[0]][position[1]]
     neighbor_offsets = [[-1, 0], [1, 0], [0, -1], [0, 1]]
@@ -20,6 +27,7 @@ def flood_fill(position: tuple[int, int], already_found: set[tuple[int, int]]) -
             already_found = flood_fill((cand_u, cand_v), already_found)
     return already_found
 
+
 @dataclass(frozen=True, eq=True)
 class FencePiece:
     pos_upper_left: tuple[int, int]
@@ -31,13 +39,46 @@ class FencePiece:
             return False
         # without loss of generality, self will be the upper or left piece that gets merged
         if self.vertical:
-            return (self.pos_upper_left[0] + self.length == other.pos_upper_left[0]) and (
-                self.pos_upper_left[1] == other.pos_upper_left[1]
-            )
+            # test that we're not crossing between two holes
+
+            if not (
+                (
+                    map_safe_get((self.pos_upper_left[0] + self.length - 1, 
+                                  self.pos_upper_left[1]))
+                    == map_safe_get((self.pos_upper_left[0] + self.length, 
+                                  self.pos_upper_left[1]))
+                )
+                or (
+                    map_safe_get((self.pos_upper_left[0] + self.length - 1, 
+                                  self.pos_upper_left[1] + 1))
+                    == map_safe_get((self.pos_upper_left[0] + self.length, 
+                                  self.pos_upper_left[1] + 1))
+                )
+            ):
+                return False
+            return (
+                self.pos_upper_left[0] + self.length == other.pos_upper_left[0]
+            ) and (self.pos_upper_left[1] == other.pos_upper_left[1])
         else:
+            if not (
+                (
+                    map_safe_get((self.pos_upper_left[0], 
+                                  self.pos_upper_left[1] + self.length - 1))
+                    == map_safe_get((self.pos_upper_left[0], 
+                                     self.pos_upper_left[1] + self.length))
+                )
+                or (
+                    map_safe_get((self.pos_upper_left[0] + 1, 
+                                  self.pos_upper_left[1] + self.length - 1))
+                    == map_safe_get((self.pos_upper_left[0] + 1, 
+                                     self.pos_upper_left[1] + self.length))
+                )
+            ):
+                return False
             return (self.pos_upper_left[0] == other.pos_upper_left[0]) and (
                 self.pos_upper_left[1] + self.length == other.pos_upper_left[1]
             )
+
 
 def compute_raw_fence_pieces(plot_set: set[tuple[int, int]]):
     fence_piece_set: set[FencePiece] = set()
@@ -46,7 +87,7 @@ def compute_raw_fence_pieces(plot_set: set[tuple[int, int]]):
             FencePiece(pos, True, 1),
             FencePiece(pos, False, 1),
             FencePiece((pos[0] - 1, pos[1]), False, 1),
-            FencePiece((pos[0], pos[1] - 1), True, 1)
+            FencePiece((pos[0], pos[1] - 1), True, 1),
         ]
         for piece in fence_pieces:
             if piece in fence_piece_set:
@@ -54,6 +95,7 @@ def compute_raw_fence_pieces(plot_set: set[tuple[int, int]]):
             else:
                 fence_piece_set.add(piece)
     return fence_piece_set
+
 
 def merge_fence_pieces(fence_piece_set: set[FencePiece]):
     found_merge = True
@@ -75,7 +117,7 @@ def merge_fence_pieces(fence_piece_set: set[FencePiece]):
 
 
 everything_found = set()
-individual_plots: list[tuple[str, set[tuple[int, int]]]]= []
+individual_plots: list[tuple[str, set[tuple[int, int]]]] = []
 
 for u in range(rows):
     for v in range(cols):
